@@ -1,0 +1,393 @@
+preferences {
+	input("username", "text", title: "Username", description: "Your neviweb username (usually an email address)")
+	input("password", "password", title: "Password", description: "Your neviweb password")
+    input("devicid", "text", title: "Device Id:", description: "Device number for the thermostat (from 1 to 255)")
+}
+metadata {
+	definition (name: "Sinope Thermo.", namespace: "Mdbashi", author: "Moustafa Dalal Bachi") {
+		capability "Polling"
+		capability "Thermostat"
+		capability "Temperature Measurement"
+		capability "Presence Sensor"
+		capability "Sensor"
+        
+		command "away"
+		command "present"
+		command "setPresence"
+		command "heatingSetpointUp"
+		command "heatingSetpointDown"
+		command "setFahrenheit"
+		command "setCelsius"
+
+		attribute "temperatureUnit", "string"
+	}
+
+	simulator {
+		// TODO: define status and reply messages here
+	}
+
+	tiles (scale: 2) {
+		valueTile("temperature", "device.temperature", canChangeIcon: true, canChangeBackground:true, width: 2, height: 2) {
+			state("temperature", label: '${currentValue}°', backgroundColors: [
+				// Celsius Color Range
+				[value: 0, color: "#153591"],
+				[value: 7, color: "#1e9cbb"],
+				[value: 15, color: "#90d2a7"],
+				[value: 23, color: "#44b621"],
+				[value: 29, color: "#f1d801"],
+				[value: 33, color: "#d04e00"],
+				[value: 36, color: "#bc2323"],
+				// Fahrenheit Color Range
+				[value: 40, color: "#153591"],
+				[value: 44, color: "#1e9cbb"],
+				[value: 59, color: "#90d2a7"],
+				[value: 74, color: "#44b621"],
+				[value: 84, color: "#f1d801"],
+				[value: 92, color: "#d04e00"],
+				[value: 96, color: "#bc2323"]
+			]
+			)
+		}
+
+		standardTile("thermostatMode", "device.thermostatMode", inactiveLabel: true, decoration: "flat", width: 2, height: 2) {
+			state("auto", action:"thermostat.off", icon: "st.thermostat.auto")
+			state("off", action:"thermostat.cool", icon: "st.thermostat.heating-cooling-off")
+			state("cool", action:"thermostat.heat", icon: "st.thermostat.cool")
+			state("heat", action:"thermostat.auto", icon: "st.thermostat.heat")
+		}
+
+		valueTile("heatingSetpoint", "device.heatingSetpoint", width: 2, height: 2) {
+			state "default", label:'${currentValue}°', backgroundColor:"#bc2323"
+		}
+
+		
+		valueTile("thermostatOperatingState", "device.thermostatOperatingState", width: 2, height: 2,canChangeIcon: true,canChangeBackground:true) {
+			state "default", label:'Heating power \n ${currentValue}%', backgroundColors: [
+				// Celsius Color Range
+				[value: 0, color: "#153591"],
+				[value: 7, color: "#1e9cbb"],
+				[value: 15, color: "#90d2a7"],
+				[value: 23, color: "#44b621"],
+				[value: 29, color: "#f1d801"],
+				[value: 33, color: "#d04e00"],
+				[value: 36, color: "#bc2323"],
+				// Fahrenheit Color Range
+				[value: 40, color: "#153591"],
+				[value: 44, color: "#1e9cbb"],
+				[value: 59, color: "#90d2a7"],
+				[value: 74, color: "#44b621"],
+				[value: 84, color: "#f1d801"],
+				[value: 92, color: "#d04e00"],
+				[value: 96, color: "#bc2323"]
+			]
+
+		}
+        standardTile("presence", "device.presence", inactiveLabel: false, width: 2, height: 2, decoration: "flat") {
+			state "present", label:'Home', action:"away", icon: "st.Home.home2"
+			state "not present", label:'Away', action:"present", icon: "st.Transportation.transportation5"
+		}
+     
+		valueTile("realdeviceName", "device.realname", inactiveLabel: True, height: 1, width:5, decoration: "flat") {
+			state "default", label:'${currentValue}'  //, backgroundColor: "#359115"
+		}
+
+		standardTile("refresh", "device.thermostatMode", inactiveLabel: false, width: 2, height: 2, decoration: "flat") {
+			state "default", action:"polling.poll", icon:"st.secondary.refresh"
+		}
+
+		standardTile("temperatureUnit", "device.temperatureUnit", width: 2, height: 2, canChangeIcon: false) {
+			state "fahrenheit",  label: "°F", icon: "st.alarm.temperature.normal", action:"setCelsius"
+			state "celsius", label: "°C", icon: "st.alarm.temperature.normal", action:"setFahrenheit"
+		}
+
+		controlTile("heatSliderControl", "device.heatingSetpoint", "slider", width: 2, height: 2, inactiveLabel: false) {
+			state "setHeatingSetpoint", label:'Set temperature to', action:"thermostat.setHeatingSetpoint"
+         }
+
+		standardTile("heatingSetpointUp", "device.heatingSetpoint", canChangeIcon: false, width: 2, height: 2, inactiveLabel: false, decoration: "flat") {
+			state "heatingSetpointUp", label:'  ', action:"heatingSetpointUp", icon:"st.thermostat.thermostat-up", backgroundColor:"#bc2323"
+		}
+
+		standardTile("heatingSetpointDown", "device.heatingSetpoint", canChangeIcon: false, width: 2, height: 2, inactiveLabel: false, decoration: "flat") {
+			state "heatingSetpointDown", label:'  ', action:"heatingSetpointDown", icon:"st.thermostat.thermostat-down", backgroundColor:"#bc2323"
+		}
+
+		main(["temperature", "thermostatOperatingState"])
+		//details(["temperature", "thermostatOperatingState", "thermostatMode", "heatingSetpoint", "heatSliderControl",  "temperatureUnit", "refresh","DeviceName"])
+          details(["realdeviceName","temperature", "thermostatOperatingState","presence",  "heatingSetpointDown", "heatingSetpoint", "heatingSetpointUp",  "refresh"])
+         
+	}
+
+}
+
+def parse(String description) {
+
+}
+
+// handle commands
+def setHeatingSetpoint(temp) {
+	def latestThermostatMode = device.latestState('thermostatMode')
+	def temperatureUnit = device.latestValue('temperatureUnit')
+	if(!isLoggedIn()) {
+		log.debug "Need to login"
+		login(method, args, success)
+		return
+	}
+		if (temp) {
+				if (temp < 10) {
+					temp = 10
+				}
+				if (temp > 32) {
+					temp = 24
+				}
+                def thermostatID=data.devices.id [settings.devicid.toInteger()-1]
+                def params = [
+				uri: "https://neviweb.com/api/device/${thermostatID}/setpoint",
+        		headers: ['Session-Id' : data.auth.session],
+           	 	body: "temperature=${temp}"
+    			]
+                log.debug params
+                 
+                 httpPut(params){resp ->
+                 log.debug resp.data
+                 }
+                 
+               sendEvent(name: 'heatingSetpoint', value: temp, unit: temperatureUnit, state: "heat")
+               runIn(10, poll)
+	}		
+
+	
+
+}
+def heatingSetpointUp(){
+	BigDecimal newSetpoint = device.currentValue("heatingSetpoint") + 0.5
+	log.debug "Setting heat set point up to: ${newSetpoint}"
+	setHeatingSetpoint(newSetpoint)
+}
+
+def heatingSetpointDown(){
+	BigDecimal newSetpoint = device.currentValue("heatingSetpoint") - 0.5
+	log.debug "Setting heat set point down to: ${newSetpoint}"
+	setHeatingSetpoint(newSetpoint)
+}
+
+def setFahrenheit() {
+	def temperatureUnit = "fahrenheit"
+	log.debug "Setting temperatureUnit to: ${temperatureUnit}"
+	sendEvent(name: "temperatureUnit",   value: temperatureUnit)
+	//poll()
+}
+
+def setCelsius() {
+	def temperatureUnit = "celsius"
+	log.debug "Setting temperatureUnit to: ${temperatureUnit}"
+	sendEvent(name: "temperatureUnit",   value: temperatureUnit)
+	//poll()
+}
+
+def off() {
+	setThermostatMode('off')
+}
+
+def manuel() {
+	setThermostatMode('manuel')
+}
+
+
+def auto() {
+	setThermostatMode('auto')
+}
+//// need modification
+def setThermostatMode(mode) {
+	mode = mode == 'emergency heat'? 'heat' : mode
+	mode = mode == 'range' ? 'auto' : mode
+		sendEvent(name: 'thermostatMode', value: mode)
+}
+//////
+
+def away() {
+	setPresence('away')
+	sendEvent(name: 'presence', value: 'not present')
+}
+
+def present() {
+	setPresence('present')
+	sendEvent(name: 'presence', value: 'present')
+}
+
+def setPresence(status) {
+	if(!isLoggedIn()) {
+		log.debug "Need to login"
+		login(method, args, success)
+		return
+	}
+	log.debug "Status: $status"
+ 
+    def thermostatID=data.devices.id [settings.devicid.toInteger()-1]
+    
+	switch (status) {
+			case "present":
+            
+            def params = [
+			uri: "https://neviweb.com/api/device/${thermostatID}/mode",
+        	headers: ['Session-Id' : data.auth.session],
+            body: "mode=3"
+    		]
+            httpPut(params)	{resp ->
+				log.debug resp.data
+        	}
+            break;
+            case "away":
+            def params = [
+			uri: "https://neviweb.com/api/device/${thermostatID}/mode",
+        	headers: ['Session-Id' : data.auth.session],
+            body: "mode=0"
+    		]
+         
+            httpPut(params)	{resp ->
+				log.debug resp.data
+        	}
+            break;
+            }
+	
+		poll()
+	
+}
+
+def poll() {
+	if(!isLoggedIn()) {
+		log.debug "Need to login"
+		login(method, args, success)
+		return
+	}
+    
+	log.debug "Executing 'poll'"
+   
+   	def thermostatID=data.devices.id [settings.devicid.toInteger()-1]
+    
+    def params = [
+		uri: "https://neviweb.com/api/device/${thermostatID}/data",
+		requestContentType: "application/x-www-form-urlencoded; charset=UTF-8",
+        headers: ['Session-Id' : data.auth.session]
+    	]
+     
+        httpGet(params) {resp ->
+		data.status = resp.data
+        }
+        log.debug "after status.... ${data}"
+        
+        Double bd1 = new Double(data.status.temperature);
+        def temperature =Math.round(bd1*10)/10 
+        def MyheatingSetpoint=0.0
+        if (data.status.setpoint== null){
+        	   MyheatingSetpoint =0
+        }else{
+            Double bd2 = new Double(data.status.setpoint);
+             MyheatingSetpoint =Math.round(bd2*10)/10 
+        }
+        
+  	 
+  		sendEvent(name: 'temperature', value: temperature, unit: temperatureUnit, state: temperatureType)	
+		sendEvent(name: 'heatingSetpoint', value: MyheatingSetpoint, unit: temperatureUnit, state: "heat")	
+        log.debug "My setpoint is .....${MyheatingSetpoint}"
+		
+    			if (data.status.mode== 0 | data.status.mode== 5 | data.status.mode== 133  ) {
+					sendEvent(name: 'presence', value: 'not present')
+                    log.debug "Thermostat is off"
+				} else{
+					sendEvent(name: 'presence', value: 'present')
+                    log.debug "Thermostat is on"
+				}
+
+			sendEvent(name: 'thermostatOperatingState', value: "${data.status.heatLevel}")
+            def mydevice=data.devices.name[settings.devicid.toInteger() - 1]
+            
+             sendEvent(name: 'realname', value: "${mydevice}")
+             def ipaddress=settings.pwrmeterip
+
+            
+runIn(40, poll)
+
+}
+
+
+def logout(method = null, args = [], success = {}) {
+      	def 	params = [
+		uri: "https://neviweb.com",
+        path: "/api/logout",
+       	requestContentType: "application/x-www-form-urlencoded; charset=UTF-8",
+        headers: ['Session-Id' : data.auth.session]
+    	]
+        
+        httpGet(params) {resp ->
+		data.auth = resp.data
+        }
+        log.debug "logout.. ${data.auth}" 
+}
+def login(method = null, args = [], success = {}) {
+		def params = [
+		uri: 'https://neviweb.com/api/login',
+		body: "email=${settings.username}&password=${settings.password}&stayConnected=0",
+        requestContentType: "application/x-www-form-urlencoded; charset=UTF-8"
+    	]
+    	httpPost(params) {response ->
+		data.auth = response.data
+		//log.debug data.auth
+        }
+        if(!data.auth) {
+		log.debug "No data.auth"
+		return 
+		}
+        
+        
+       	params = [
+		uri: "https://neviweb.com",
+        path: "/api/gateway",
+       	requestContentType: "application/json, text/javascript, */*; q=0.01",
+        headers: ['Session-Id' : data.auth.session]
+    	]
+    	httpGet(params) {resp ->
+		data.gateway = resp.data
+        }
+            
+        params = [
+		uri: "https://neviweb.com",
+        path: "/api/device",
+        query: ['gatewayId' : data.gateway.id],
+       	requestContentType: "application/json, text/javascript, */*; q=0.01",
+        headers: ['Session-Id' : data.auth.session]
+   		 ]
+        // log.debug params
+    	httpGet(params) {resp ->
+		data.devices = resp.data
+        }
+        log.debug "Loged in.." 
+}
+
+def isLoggedIn() {
+	if(!data.auth) {
+		log.debug "No data.auth"
+		return false
+	}
+    def params = [
+		uri: "https://neviweb.com",
+        path: "/api/gateway",
+       	requestContentType: "application/json, text/javascript, */*; q=0.01",
+        headers: ['Session-Id' : data.auth.session]
+   	]
+    	httpGet(params) {resp ->
+        if (resp.data.sessionExpired==true){
+        return false
+        }
+       }
+
+	return true // data.auth.expires_in > now
+}
+
+def cToF(temp) {
+	return (temp * 1.8 + 32).toDouble()
+}
+
+def fToC(temp) {
+	return ((temp - 32) / 1.8).toDouble()
+}
