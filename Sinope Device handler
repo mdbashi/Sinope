@@ -258,7 +258,7 @@ def poll() {
 	if(!isLoggedIn()) {
 		log.debug "Need to login"
 		login(method, args, success)
-		return
+		
 	}
     
 	log.debug "Executing 'poll'"
@@ -365,11 +365,7 @@ def login(method = null, args = [], success = {}) {
 }
 
 def isLoggedIn() {
-	if(!data.auth) {
-		log.debug "No data.auth"
-		return false
-	}
-    def params = [
+def params = [
 		uri: "https://neviweb.com",
         path: "/api/gateway",
        	requestContentType: "application/json, text/javascript, */*; q=0.01",
@@ -377,11 +373,17 @@ def isLoggedIn() {
    	]
     	httpGet(params) {resp ->
         if (resp.data.sessionExpired==true){
-        return false
+        log.debug "session Expired"
+        data.auth=""
         }
+        log.debug resp.data
        }
-
-	return true // data.auth.expires_in > now
+if(!data.auth) {
+	log.debug "No data.auth"
+	return false
+} else {
+   
+return true
 }
 
 def cToF(temp) {
