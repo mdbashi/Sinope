@@ -384,6 +384,8 @@ if(!data.auth) {
 } else {
    
 return true
+
+}
 }
 
 def cToF(temp) {
