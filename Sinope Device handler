@@ -114,7 +114,7 @@ metadata {
 
 		main(["temperature", "thermostatOperatingState"])
 		//details(["temperature", "thermostatOperatingState", "thermostatMode", "heatingSetpoint", "heatSliderControl",  "temperatureUnit", "refresh","DeviceName"])
-          details(["realdeviceName","temperature", "thermostatOperatingState","presence",  "heatingSetpointDown", "heatingSetpoint", "heatingSetpointUp",  "refresh"])
+          details(["realdeviceName","temperature", "thermostatOperatingState","presence",  "heatingSetpointDown", "heatingSetpoint", "heatingSetpointUp","temperatureUnit",  "refresh"])
          
 	}
 
@@ -306,7 +306,7 @@ def poll() {
              def ipaddress=settings.pwrmeterip
 
             
-runIn(40, poll)
+runIn(60, poll)
 
 }
 
