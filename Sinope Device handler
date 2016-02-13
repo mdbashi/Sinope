@@ -18,6 +18,7 @@ metadata {
 		command "heatingSetpointDown"
 		command "setFahrenheit"
 		command "setCelsius"
+        command "logout"
 
 		attribute "temperatureUnit", "string"
 	}
@@ -95,9 +96,9 @@ metadata {
 			state "default", action:"polling.poll", icon:"st.secondary.refresh"
 		}
 
-		standardTile("temperatureUnit", "device.temperatureUnit", width: 2, height: 2, canChangeIcon: false) {
-			state "fahrenheit",  label: "°F", icon: "st.alarm.temperature.normal", action:"setCelsius"
-			state "celsius", label: "°C", icon: "st.alarm.temperature.normal", action:"setFahrenheit"
+		valueTile("temperatureUnit", "device.temperatureUnit", width: 2, height: 2, canChangeIcon: false) {
+			state "fahrenheit",  label: "°F", icon: "st.alarm.temperature.normal"//, action:"setCelsius"
+			state "celsius", label: "°C", icon: "st.alarm.temperature.normal"//, action:"setFahrenheit"
 		}
 
 		controlTile("heatSliderControl", "device.heatingSetpoint", "slider", width: 2, height: 2, inactiveLabel: false) {
@@ -114,7 +115,7 @@ metadata {
 
 		main(["temperature", "thermostatOperatingState"])
 		//details(["temperature", "thermostatOperatingState", "thermostatMode", "heatingSetpoint", "heatSliderControl",  "temperatureUnit", "refresh","DeviceName"])
-          details(["realdeviceName","temperature", "thermostatOperatingState","presence",  "heatingSetpointDown", "heatingSetpoint", "heatingSetpointUp","temperatureUnit",  "refresh"])
+          details(["realdeviceName","temperature", "thermostatOperatingState","presence",  "heatingSetpointDown", "heatingSetpoint", "heatingSetpointUp","temperatureUnit" , "refresh"])
          
 	}
 
@@ -128,20 +129,31 @@ def parse(String description) {
 def setHeatingSetpoint(temp) {
 	def latestThermostatMode = device.latestState('thermostatMode')
 	def temperatureUnit = device.latestValue('temperatureUnit')
+
 	if(!isLoggedIn()) {
 		log.debug "Need to login"
 		login(method, args, success)
 		return
 	}
-		if (temp) {
+                    def thermostatID=data.devices.id [settings.devicid.toInteger()-1]
+    switch (temperatureUnit) {
+		case "celsius":
+         	temp=temp      
+         	break;
+        default:
+			temp=fToC(Math.round(temp))
+			break;
+            }
+				if (temp) {
 				if (temp < 10) {
 					temp = 10
 				}
-				if (temp > 32) {
-					temp = 24
+				if (temp > 31) {
+					temp = 31
 				}
-                def thermostatID=data.devices.id [settings.devicid.toInteger()-1]
-                def params = [
+              
+                } 
+	 			def params = [
 				uri: "https://neviweb.com/api/device/${thermostatID}/setpoint",
         		headers: ['Session-Id' : data.auth.session],
            	 	body: "temperature=${temp}"
@@ -152,21 +164,49 @@ def setHeatingSetpoint(temp) {
                  log.debug resp.data
                  }
                  
-               sendEvent(name: 'heatingSetpoint', value: temp, unit: temperatureUnit, state: "heat")
+               switch (temperatureUnit) {
+		case "celsius":
+         	sendEvent(name: 'heatingSetpoint', value: temp, unit: temperatureUnit, state: "heat")     
+         	break;
+        default:
+       
+			sendEvent(name: 'heatingSetpoint', value: Math.round(cToF(temp)), unit: temperatureUnit, state: "heat")
+			break;
+            }  
+               
                runIn(10, poll)
 	}		
 
 	
 
-}
+
 def heatingSetpointUp(){
-	BigDecimal newSetpoint = device.currentValue("heatingSetpoint") + 0.5
+def temperatureUnit = device.latestValue('temperatureUnit')
+Double newSetpoint=0.0
+ switch (temperatureUnit) {
+		case "celsius":
+         	 newSetpoint = device.currentValue("heatingSetpoint") + 0.5     
+         	break;
+        default:
+			 newSetpoint = Math.round(device.currentValue("heatingSetpoint") + 1)
+			break;
+            }
+	
 	log.debug "Setting heat set point up to: ${newSetpoint}"
 	setHeatingSetpoint(newSetpoint)
 }
 
 def heatingSetpointDown(){
-	BigDecimal newSetpoint = device.currentValue("heatingSetpoint") - 0.5
+Double newSetpoint=0.0
+def temperatureUnit = device.latestValue('temperatureUnit')
+ switch (temperatureUnit) {
+		case "celsius":
+         	 newSetpoint = device.currentValue("heatingSetpoint") - 0.5     
+         	break;
+        default:
+			 newSetpoint = Math.round(device.currentValue("heatingSetpoint") - 1)
+			break;
+            }
 	log.debug "Setting heat set point down to: ${newSetpoint}"
 	setHeatingSetpoint(newSetpoint)
 }
@@ -175,14 +215,14 @@ def setFahrenheit() {
 	def temperatureUnit = "fahrenheit"
 	log.debug "Setting temperatureUnit to: ${temperatureUnit}"
 	sendEvent(name: "temperatureUnit",   value: temperatureUnit)
-	//poll()
+	poll()
 }
 
 def setCelsius() {
 	def temperatureUnit = "celsius"
 	log.debug "Setting temperatureUnit to: ${temperatureUnit}"
 	sendEvent(name: "temperatureUnit",   value: temperatureUnit)
-	//poll()
+	poll()
 }
 
 def off() {
@@ -255,6 +295,7 @@ def setPresence(status) {
 }
 
 def poll() {
+def temperatureUnit = device.latestValue('temperatureUnit')
 	if(!isLoggedIn()) {
 		log.debug "Need to login"
 		login(method, args, success)
@@ -275,7 +316,11 @@ def poll() {
 		data.status = resp.data
         }
         log.debug "after status.... ${data}"
-        
+         if (data.auth.user.format.temperature=='c'){
+            setCelsius ()
+         } else{
+            setFahrenheit()
+         }
         Double bd1 = new Double(data.status.temperature);
         def temperature =Math.round(bd1*10)/10 
         def MyheatingSetpoint=0.0
@@ -283,7 +328,18 @@ def poll() {
         	   MyheatingSetpoint =0
         }else{
             Double bd2 = new Double(data.status.setpoint);
-             MyheatingSetpoint =Math.round(bd2*10)/10 
+             switch (temperatureUnit) {
+			case "celsius":
+            MyheatingSetpoint =Math.round(bd2*10)/10 
+            
+            break;
+            default:
+            MyheatingSetpoint =Math.round(cToF(bd2))
+            temperature =Math.round(cToF(bd1))
+            
+            break;
+            }
+             
         }
         
   	 
@@ -305,9 +361,10 @@ def poll() {
              sendEvent(name: 'realname', value: "${mydevice}")
              def ipaddress=settings.pwrmeterip
 
+
             
 runIn(60, poll)
-
+logout()
 }
 
 
@@ -365,6 +422,8 @@ def login(method = null, args = [], success = {}) {
 }
 
 def isLoggedIn() {
+log.debug "try to check if it's login... ${data.auth}"
+if (data.auth){
 def params = [
 		uri: "https://neviweb.com",
         path: "/api/gateway",
@@ -376,8 +435,9 @@ def params = [
         log.debug "session Expired"
         data.auth=""
         }
-        log.debug resp.data
        }
+}
+
 if(!data.auth) {
 	log.debug "No data.auth"
 	return false
