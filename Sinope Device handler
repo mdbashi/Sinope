@@ -8,7 +8,7 @@ metadata {
 		capability "Polling"
 		capability "Thermostat"
 		capability "Temperature Measurement"
-		capability "Presence Sensor"
+		
 		capability "Sensor"
         
 		command "away"
@@ -97,8 +97,8 @@ metadata {
 		}
 
 		valueTile("temperatureUnit", "device.temperatureUnit", width: 2, height: 2, canChangeIcon: false) {
-			state "fahrenheit",  label: "°F", icon: "st.alarm.temperature.normal"//, action:"setCelsius"
-			state "celsius", label: "°C", icon: "st.alarm.temperature.normal"//, action:"setFahrenheit"
+			state "fahrenheit",  label: "°F"
+			state "celsius", label: "°C"
 		}
 
 		controlTile("heatSliderControl", "device.heatingSetpoint", "slider", width: 2, height: 2, inactiveLabel: false) {
@@ -133,9 +133,9 @@ def setHeatingSetpoint(temp) {
 	if(!isLoggedIn()) {
 		log.debug "Need to login"
 		login(method, args, success)
-		return
+		
 	}
-                    def thermostatID=data.devices.id [settings.devicid.toInteger()-1]
+    def thermostatID=data.devices.id [settings.devicid.toInteger()-1]
     switch (temperatureUnit) {
 		case "celsius":
          	temp=temp      
@@ -145,8 +145,8 @@ def setHeatingSetpoint(temp) {
 			break;
             }
 				if (temp) {
-				if (temp < 10) {
-					temp = 10
+				if (temp < 1) {
+					temp = 1
 				}
 				if (temp > 31) {
 					temp = 31
@@ -158,18 +158,18 @@ def setHeatingSetpoint(temp) {
         		headers: ['Session-Id' : data.auth.session],
            	 	body: "temperature=${temp}"
     			]
-                log.debug params
+                
                  
                  httpPut(params){resp ->
                  log.debug resp.data
                  }
                  
-               switch (temperatureUnit) {
+                 
+   switch (temperatureUnit) {
 		case "celsius":
          	sendEvent(name: 'heatingSetpoint', value: temp, unit: temperatureUnit, state: "heat")     
          	break;
         default:
-       
 			sendEvent(name: 'heatingSetpoint', value: Math.round(cToF(temp)), unit: temperatureUnit, state: "heat")
 			break;
             }  
@@ -215,14 +215,14 @@ def setFahrenheit() {
 	def temperatureUnit = "fahrenheit"
 	log.debug "Setting temperatureUnit to: ${temperatureUnit}"
 	sendEvent(name: "temperatureUnit",   value: temperatureUnit)
-	poll()
+	
 }
 
 def setCelsius() {
 	def temperatureUnit = "celsius"
 	log.debug "Setting temperatureUnit to: ${temperatureUnit}"
 	sendEvent(name: "temperatureUnit",   value: temperatureUnit)
-	poll()
+
 }
 
 def off() {
@@ -237,13 +237,13 @@ def manuel() {
 def auto() {
 	setThermostatMode('auto')
 }
-//// need modification
+
 def setThermostatMode(mode) {
 	mode = mode == 'emergency heat'? 'heat' : mode
 	mode = mode == 'range' ? 'auto' : mode
 		sendEvent(name: 'thermostatMode', value: mode)
 }
-//////
+
 
 def away() {
 	setPresence('away')
@@ -261,7 +261,7 @@ def setPresence(status) {
 		login(method, args, success)
 		return
 	}
-	log.debug "Status: $status"
+
  
     def thermostatID=data.devices.id [settings.devicid.toInteger()-1]
     
@@ -315,7 +315,7 @@ def temperatureUnit = device.latestValue('temperatureUnit')
         httpGet(params) {resp ->
 		data.status = resp.data
         }
-        log.debug "after status.... ${data}"
+        //log.debug "after status.... ${data}"
          if (data.auth.user.format.temperature=='c'){
             setCelsius ()
          } else{
@@ -346,6 +346,7 @@ def temperatureUnit = device.latestValue('temperatureUnit')
   		sendEvent(name: 'temperature', value: temperature, unit: temperatureUnit, state: temperatureType)	
 		sendEvent(name: 'heatingSetpoint', value: MyheatingSetpoint, unit: temperatureUnit, state: "heat")	
         log.debug "My setpoint is .....${MyheatingSetpoint}"
+         log.debug "My temperature is .....${temperature}"
 		
     			if (data.status.mode== 0 | data.status.mode== 5 | data.status.mode== 133  ) {
 					sendEvent(name: 'presence', value: 'not present')
@@ -379,7 +380,7 @@ def logout(method = null, args = [], success = {}) {
         httpGet(params) {resp ->
 		data.auth = resp.data
         }
-        log.debug "logout.. ${data.auth}" 
+        log.debug "logout.. " 
 }
 def login(method = null, args = [], success = {}) {
 		def params = [
@@ -389,10 +390,10 @@ def login(method = null, args = [], success = {}) {
     	]
     	httpPost(params) {response ->
 		data.auth = response.data
-		//log.debug data.auth
+		
         }
         if(!data.auth) {
-		log.debug "No data.auth"
+		log.debug "Problem in Login, unable to get data auth."
 		return 
 		}
         
@@ -414,7 +415,7 @@ def login(method = null, args = [], success = {}) {
        	requestContentType: "application/json, text/javascript, */*; q=0.01",
         headers: ['Session-Id' : data.auth.session]
    		 ]
-        // log.debug params
+
     	httpGet(params) {resp ->
 		data.devices = resp.data
         }
@@ -422,7 +423,7 @@ def login(method = null, args = [], success = {}) {
 }
 
 def isLoggedIn() {
-log.debug "try to check if it's login... ${data.auth}"
+log.debug "Is it login?..."
 if (data.auth){
 def params = [
 		uri: "https://neviweb.com",
@@ -432,17 +433,17 @@ def params = [
    	]
     	httpGet(params) {resp ->
         if (resp.data.sessionExpired==true){
-        log.debug "session Expired"
+        log.debug "No session Expired"
         data.auth=""
         }
        }
 }
 
 if(!data.auth) {
-	log.debug "No data.auth"
+	log.debug "No, data auth. missing "
 	return false
 } else {
-   
+log.debug "Yes.."
 return true
 
 }
