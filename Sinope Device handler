@@ -424,7 +424,7 @@ def login(method = null, args = [], success = {}) {
 
 def isLoggedIn() {
 log.debug "Is it login?..."
-if (data.auth){
+try{
 def params = [
 		uri: "https://neviweb.com",
         path: "/api/gateway",
@@ -437,7 +437,7 @@ def params = [
         data.auth=""
         }
        }
-}
+
 
 if(!data.auth) {
 	log.debug "No, data auth. missing "
@@ -445,7 +445,9 @@ if(!data.auth) {
 } else {
 log.debug "Yes.."
 return true
-
+}catch (e){
+log.debug "No.."
+return false
 }
 }
 
