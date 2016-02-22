@@ -445,6 +445,7 @@ if(!data.auth) {
 } else {
 log.debug "Yes.."
 return true
+}
 }catch (e){
 log.debug "No.."
 return false
